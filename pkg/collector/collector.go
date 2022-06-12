@@ -46,13 +46,13 @@ func (c *Collector) Attach() error {
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	lock.Lock()
 	defer lock.Unlock()
-	for range podEnergy {
+	for range containerEnergy {
 		desc := prometheus.NewDesc(
-			"pod_energy_stat",
-			"Pod energy consumption status",
+			"container_energy_stat",
+			"Container energy consumption status",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//				"pod_namespace",
 				"command",
 				"total_cpu_time",
 				"curr_cpu_time",
@@ -82,8 +82,8 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 		ch <- desc
 	}
 	desc := prometheus.NewDesc(
-		"node_energy_total_joules",
-		"Pod total energy consumption",
+		"container_energy_total_joules",
+		"Container total energy consumption",
 		[]string{
 			"instance",
 			"service",
@@ -93,16 +93,55 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- desc
 }
 
+//To calculate energy from the whole EdgeDevice
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	lock.Lock()
 	defer lock.Unlock()
-	for _, v := range podEnergy {
+	de := prometheus.NewDesc(
+		"EdgeDevice_energy_stat",
+		"EdgeDevice energy consumption stats",
+		[]string{
+			"EdgeDevice_name",
+			"cpu_architecture",
+			"curr_cpu_time",
+			"curr_cpu_cycles",
+			"curr_cpu_instructions",
+			"curr_resident_memory",
+			"curr_cache_misses",
+			"curr_energy_in_core",
+			"curr_energy_in_dram",
+			"curr_energy_in_gpu",
+			"curr_energy_in_other",
+		},
+		nil,
+	)
+	cpuTime := fmt.Sprintf("%f", currEdgeDeviceEnergy.CPUTime)
+	energyInCore := fmt.Sprintf("%f", currEdgeDeviceEnergy.EnergyInCore)
+	energyInDram := fmt.Sprintf("%f", currEdgeDeviceEnergy.EnergyInDram)
+	energyInOther := fmt.Sprintf("%f", currEdgeDeviceEnergy.EnergyInOther)
+	energyInGpu := fmt.Sprintf("%f", currEdgeDeviceEnergy.EnergyInGPU)
+	resMem := fmt.Sprintf("%f", currEdgeDeviceEnergy.EdgeDeviceMem)
+	desc := prometheus.MustNewConstMetric(
+		de,
+		prometheus.CounterValue,
+		currEdgeDeviceEnergy.EnergyInCore+currEdgeDeviceEnergy.EnergyInDram+currEdgeDeviceEnergy.EnergyInOther+currEdgeDeviceEnergy.EnergyInGPU,
+		EdgeDeviceName, cpuArch,
+		cpuTime,
+		strconv.FormatUint(currEdgeDeviceEnergy.CPUCycles, 10),
+		strconv.FormatUint(currEdgeDeviceEnergy.CPUInstr, 10),
+		resMem,
+		strconv.FormatUint(currEdgeDeviceEnergy.CacheMisses, 10),
+		energyInCore, energyInDram, energyInGpu, energyInOther,
+	)
+	ch <- desc
+
+	for _, v := range containerEnergy {
 		de := prometheus.NewDesc(
-			"pod_energy_stat",
-			"Pod energy consumption stats",
+			"container_energy_stat",
+			"Container energy consumption stats",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				"container_namespace",
 				"command",
 				"total_cpu_time",
 				"curr_cpu_time",
@@ -137,7 +176,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de,
 			prometheus.CounterValue,
 			float64(v.CurrEnergyInCore+v.CurrEnergyInDram+v.CurrEnergyInGPU+v.CurrEnergyInOther),
-			v.PodName, v.Namespace, v.Command,
+			v.ContainerName, v.Namespace, v.Command,
 			aggCPU, currCPU,
 			strconv.FormatUint(v.AggCPUCycles, 10), strconv.FormatUint(v.CurrCPUCycles, 10),
 			strconv.FormatUint(v.AggCPUInstr, 10), strconv.FormatUint(v.CurrCPUInstr, 10),
@@ -152,13 +191,13 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		)
 		ch <- desc
 
-		// de_total and desc_total give indexable values for total energy consumptions for all pods
+		// de_total and desc_total give indexable values for total energy consumptions for all containers
 		de_total := prometheus.NewDesc(
-			"pod_energy_total",
-			"Pod total energy consumption",
+			"container_energy_total",
+			"Container total energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//			"pod_namespace",
 			},
 			nil,
 		)
@@ -166,17 +205,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_total,
 			prometheus.CounterValue,
 			float64(v.AggEnergyInCore+v.AggEnergyInDram+v.AggEnergyInOther),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_total
 
 		// de_current and desc_current give indexable values for current energy consumptions (in 3 seconds) for all pods
 		de_current := prometheus.NewDesc(
-			"pod_energy_current",
-			"Pod current energy consumption",
+			"container_energy_current",
+			"Container current energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				"container_namespace",
 			},
 			nil,
 		)
@@ -184,17 +223,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_current,
 			prometheus.GaugeValue,
 			float64(v.CurrEnergyInCore+v.CurrEnergyInDram+v.CurrEnergyInGPU+v.CurrEnergyInOther),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_current
 
 		// de_cpu_current and desc_cpu_current give indexable values for current CPU energy consumptions (in 3 seconds) for all pods
 		de_cpu_current := prometheus.NewDesc(
-			"pod_cpu_energy_current",
-			"Pod CPU current energy consumption",
+			"container_cpu_energy_current",
+			"Container CPU current energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//			"pod_namespace",
 			},
 			nil,
 		)
@@ -202,17 +241,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_cpu_current,
 			prometheus.GaugeValue,
 			float64(v.CurrEnergyInCore),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_cpu_current
 
-		// de_cpu_total and desc_cpu_total give indexable values for total CPU energy consumptions for all pods
+		// de_cpu_total and desc_cpu_total give indexable values for total CPU energy consumptions for all containers
 		de_cpu_total := prometheus.NewDesc(
-			"pod_cpu_energy_total",
-			"Pod CPU total energy consumption",
+			"container_cpu_energy_total",
+			"Container CPU total energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				"container_namespace",
 			},
 			nil,
 		)
@@ -220,17 +259,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_cpu_total,
 			prometheus.CounterValue,
 			float64(v.AggEnergyInCore),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_cpu_total
 
 		// de_dram_current and desc_dram_current give indexable values for current DRAM energy consumptions (in 3 seconds) for all pods
 		de_dram_current := prometheus.NewDesc(
-			"pod_dram_energy_current",
-			"Pod DRAM current energy consumption",
+			"container_dram_energy_current",
+			"Container DRAM current energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//				"pod_namespace",
 			},
 			nil,
 		)
@@ -238,17 +277,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_dram_current,
 			prometheus.GaugeValue,
 			float64(v.CurrEnergyInDram),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_dram_current
 
 		// de_dram_total and desc_dram_total give indexable values for total DRAM energy consumptions for all pods
 		de_dram_total := prometheus.NewDesc(
-			"pod_dram_energy_total",
-			"Pod DRAM total energy consumption",
+			"container_dram_energy_total",
+			"Container DRAM total energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//			"pod_namespace",
 			},
 			nil,
 		)
@@ -256,17 +295,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_dram_total,
 			prometheus.CounterValue,
 			float64(v.AggEnergyInDram),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_dram_total
 
 		// de_gpu_current and desc_gpu_current give indexable values for current GPU energy consumptions (in 3 seconds) for all pods
 		de_gpu_current := prometheus.NewDesc(
-			"pod_gpu_energy_current",
-			"Pod GPU current energy consumption",
+			"container_gpu_energy_current",
+			"Container GPU current energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//			"pod_namespace",
 			},
 			nil,
 		)
@@ -274,7 +313,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_gpu_current,
 			prometheus.GaugeValue,
 			float64(v.CurrEnergyInGPU),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_gpu_current
 
@@ -283,8 +322,8 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			"pod_gpu_energy_total",
 			"Pod GPU total energy consumption",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//				"pod_namespace",
 			},
 			nil,
 		)
@@ -292,7 +331,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_gpu_total,
 			prometheus.CounterValue,
 			float64(v.AggEnergyInGPU),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_gpu_total
 
@@ -301,8 +340,8 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			"pod_other_energy_joule",
 			"Pod OTHER current energy consumption besides CPU and memory",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//				"pod_namespace",
 			},
 			nil,
 		)
@@ -310,7 +349,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_other_current,
 			prometheus.GaugeValue,
 			float64(v.CurrEnergyInOther),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_other_current
 
@@ -319,8 +358,8 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			"pod_other_energy_joule_total",
 			"Pod OTHER total energy consumption besides CPU and memory",
 			[]string{
-				"pod_name",
-				"pod_namespace",
+				"container_name",
+				//				"pod_namespace",
 			},
 			nil,
 		)
@@ -328,16 +367,16 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			de_other_total,
 			prometheus.CounterValue,
 			float64(v.AggEnergyInOther),
-			v.PodName, v.Namespace,
+			v.ContainerName, v.Namespace,
 		)
 		ch <- desc_other_total
 
 	}
 
-	// de_node_energy and desc_node_energy give indexable values for total energy consumptions of a node
-	de_node_energy := prometheus.NewDesc(
-		"node_hwmon_energy_joule_total",
-		"Hardware monitor for energy consumed in joules in the node.",
+	// de_EdgeDevice_energy and desc_EdgeDevice_energy give indexable values for total energy consumptions of a EdgeDevice
+	de_EdgeDevice_energy := prometheus.NewDesc(
+		"EdgeDevice_hwmon_energy_joule_total",
+		"Hardware monitor for energy consumed in joules in the EdgeDevice.",
 		[]string{
 			"instance",
 			"chip",
@@ -345,19 +384,19 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		},
 		nil,
 	)
-	for sensorID, energy := range nodeEnergy {
+	for sensorID, energy := range EdgeDeviceEnergy {
 		desc_total := prometheus.MustNewConstMetric(
-			de_node_energy,
+			de_EdgeDevice_energy,
 			prometheus.CounterValue,
 			energy/1000.0, /*miliJoule to Joule*/
-			nodeName,
+			EdgeDeviceName,
 			sensorID,
 			"power_meter",
 		)
 		ch <- desc_total
 	}
 
-	// de_core_freq and desc_core_freq give indexable values for each cpu core freq of a node
+	// de_core_freq and desc_core_freq give indexable values for each cpu core freq of a EdgeDevice
 	de_core_freq := prometheus.NewDesc(
 		"node_cpu_scaling_frequency_hertz",
 		"Current scaled cpu thread frequency in hertz.",
@@ -366,6 +405,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		},
 		nil,
 	)
+
 	for cpuID, freq := range cpuFrequency {
 		desc_total := prometheus.MustNewConstMetric(
 			de_core_freq,
