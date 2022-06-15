@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/sustainable-computing-io/kepler/container_lister"
 	"log"
 	"os"
 	"runtime"
@@ -210,7 +211,7 @@ func (c *Collector) reader() {
 					}
 					comm := (*C.char)(unsafe.Pointer(&ct.Command))
 					// fmt.Printf("pid %v cgroup %v cmd %v\n", ct.PID, ct.CGroupPID, C.GoString(comm))
-					containerName, err := pod_lister.GetPodNameFromcGgroupID(ct.CGroupPID)
+					containerName, err := container_lister.GetPodNameFromcGgroupID(ct.CGroupPID)
 					if err != nil {
 						log.Printf("failed to resolve pod for cGroup ID %v: %v", ct.CGroupPID, err)
 						continue
@@ -218,7 +219,7 @@ func (c *Collector) reader() {
 					if _, ok := containerEnergy[containerName]; !ok {
 						containerEnergy[containerName] = &ContainerEnergy{}
 						containerEnergy[containerName].ContainerName = containerName
-						containerNamespace, err := pod_lister.GetPodNameSpaceFromcGgroupID(ct.CGroupPID)
+						containerNamespace, err := container_lister.GetPodNameSpaceFromcGgroupID(ct.CGroupPID)
 						if err != nil {
 							log.Printf("failed to find namespace for cGroup ID %v: %v", ct.CGroupPID, err)
 							containerNamespace = "unknown"
@@ -253,14 +254,14 @@ func (c *Collector) reader() {
 
 					containerEnergy[containerName].AvgCPUFreq = avgFreq
 					if e, ok := gpuEnergy[uint32(ct.PID)]; ok {
-						// fmt.Printf("gpu energy pod %v comm %v pid %v: %v\n", containerName, C.GoString(comm), ct.PID, e)
+						// fmt.Printf("gpu energy container %v comm %v pid %v: %v\n", containerName, C.GoString(comm), ct.PID, e)
 						containerEnergy[containerName].CurrEnergyInGPU += uint64(e)
 						containerEnergy[containerName].AggEnergyInGPU += containerEnergy[containerName].CurrEnergyInGPU
 					}
-					rBytes, wBytes, disks, err := pod_lister.ReadCgroupIOStat(ct.CGroupPID)
+					rBytes, wBytes, disks, err := container_lister.ReadCgroupIOStat(ct.CGroupPID)
 					// fmt.Printf("read %d write %d. Agg read %d write %d, err %v\n", rBytes, wBytes, aggBytesRead, aggBytesWrite, err)
 					if err == nil {
-						// if this is the first time the cgroup's I/O is accounted, add it to the pod
+						// if this is the first time the cgroup's I/O is accounted, add it to the container
 						if _, ok := cgroupIO[ct.CGroupPID]; !ok {
 							cgroupIO[ct.CGroupPID] = true
 							if disks > containerEnergy[containerName].Disks {
@@ -276,7 +277,7 @@ func (c *Collector) reader() {
 				}
 				// reset all counters in the eBPF table
 				c.modules.Table.DeleteAll()
-				totalReadBytes, totalWriteBytes, disks, err := pod_lister.ReadAllCgroupIOStat()
+				totalReadBytes, totalWriteBytes, disks, err := container_lister.ReadAllCgroupIOStat()
 				if err == nil {
 					if totalReadBytes > aggBytesRead && totalWriteBytes > aggBytesWrite {
 						rBytes := totalReadBytes - aggBytesRead
@@ -293,11 +294,11 @@ func (c *Collector) reader() {
 				//evenly attribute other energy among all pods
 				perProcessOtherMJ := float64(otherDelta / float64(len(containerEnergy)))
 
-				_, podMem, _, EdgeDeviceMem, err := pod_lister.GetPodMetrics()
-				if err != nil {
-					fmt.Printf("failed to get kubelet metrics: %v", err)
-				}
-
+				//_, podMem, _, EdgeDeviceMem, err := pod_lister.GetPodMetrics()
+				//if err != nil {
+				//	fmt.Printf("failed to get kubelet metrics: %v", err)
+				//}
+				EdgeDeviceMem, _ := container_lister.GetEdgeDeviceMemInBytes()
 				log.Printf("energy count: core %.2f dram: %.2f time %.6f cycles %d instructions %d misses %d EdgeDevice memory %f\n",
 					coreDelta, dramDelta, aggCPUTime, aggCPUCycles, aggCPUInstr, aggCacheMisses, EdgeDeviceMem)
 				currEdgeDeviceEnergy = &CurrEdgeDeviceEnergy{
@@ -305,7 +306,7 @@ func (c *Collector) reader() {
 					CPUCycles:     aggCPUCycles,
 					CPUInstr:      aggCPUInstr,
 					CacheMisses:   aggCacheMisses,
-					EdgeDeviceMem: EdgeDeviceMem,
+					EdgeDeviceMem: float64(EdgeDeviceMem),
 					EnergyInCore:  coreDelta,
 					EnergyInDram:  dramDelta,
 					EnergyInOther: otherDelta,
@@ -373,7 +374,7 @@ func (c *Collector) reader() {
 							v.CurrBytesRead, v.AggBytesRead,
 							v.CurrBytesRead, v.AggBytesWrite,
 							v.CurrCacheMisses, float64(v.CurrCacheMisses)/float64(aggCacheMisses),
-							float64(v.CurrResidentMem)/EdgeDeviceMem,
+							float64(v.CurrResidentMem)/float64(EdgeDeviceMem),
 							v.AvgCPUFreq/1000, /*MHZ*/
 							v.PID, v.Command)
 					}
