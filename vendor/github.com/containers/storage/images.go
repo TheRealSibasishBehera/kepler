@@ -1,15 +1,16 @@
 package storage
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/stringid"
+	"github.com/containers/storage/pkg/stringutils"
 	"github.com/containers/storage/pkg/truncindex"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -152,6 +153,7 @@ type imageStore struct {
 	byid     map[string]*Image
 	byname   map[string]*Image
 	bydigest map[digest.Digest][]*Image
+	loadMut  sync.Mutex
 }
 
 func copyImage(i *Image) *Image {
@@ -460,6 +462,19 @@ func (r *imageStore) Create(id string, names []string, layer, metadata string, c
 func (r *imageStore) addMappedTopLayer(id, layer string) error {
 	if image, ok := r.lookup(id); ok {
 		image.MappedTopLayers = append(image.MappedTopLayers, layer)
+		return r.Save()
+	}
+	return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+}
+
+func (r *imageStore) removeMappedTopLayer(id, layer string) error {
+	if image, ok := r.lookup(id); ok {
+		initialLen := len(image.MappedTopLayers)
+		image.MappedTopLayers = stringutils.RemoveFromSlice(image.MappedTopLayers, layer)
+		// No layer was removed.  No need to save.
+		if initialLen == len(image.MappedTopLayers) {
+			return nil
+		}
 		return r.Save()
 	}
 	return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
@@ -785,4 +800,15 @@ func (r *imageStore) TouchedSince(when time.Time) bool {
 
 func (r *imageStore) Locked() bool {
 	return r.lockfile.Locked()
+}
+
+func (r *imageStore) ReloadIfChanged() error {
+	r.loadMut.Lock()
+	defer r.loadMut.Unlock()
+
+	modified, err := r.Modified()
+	if err == nil && modified {
+		return r.Load()
+	}
+	return err
 }

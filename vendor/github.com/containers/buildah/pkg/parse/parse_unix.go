@@ -6,14 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containers/buildah/define"
 	"github.com/containers/storage/pkg/unshare"
-	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/pkg/errors"
 )
 
-func DeviceFromPath(device string) ([]configs.Device, error) {
-	var devs []configs.Device
+func DeviceFromPath(device string) (define.ContainerDevices, error) {
+	var devs define.ContainerDevices
 	src, dst, permissions, err := Device(device)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,6 @@ func DeviceFromPath(device string) ([]configs.Device, error) {
 	}
 
 	if !srcInfo.IsDir() {
-
 		dev, err := devices.DeviceFromPath(src, permissions)
 		if err != nil {
 			return nil, errors.Wrapf(err, "%s is not a valid device", src)
@@ -44,7 +43,7 @@ func DeviceFromPath(device string) ([]configs.Device, error) {
 	}
 	for _, d := range srcDevices {
 		d.Path = filepath.Join(dst, filepath.Base(d.Path))
-		d.Permissions = permissions
+		d.Permissions = devices.Permissions(permissions)
 		devs = append(devs, *d)
 	}
 	return devs, nil

@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-
-	"github.com/sirupsen/logrus"
+	"os"
 )
 
 // ThinpoolOptionsConfig represents the "storage.options.thinpool"
@@ -40,6 +39,10 @@ type ThinpoolOptionsConfig struct {
 
 	// log_level sets the log level of devicemapper.
 	LogLevel string `toml:"log_level"`
+
+	// MetadataSize specifies the size of the metadata for the thinpool
+	// It will be used with the `pvcreate --metadata` option.
+	MetadataSize string `toml:"metadatasize"`
 
 	// MinFreeSpace specifies the min free space percent in a thin pool
 	// require for new device creation to
@@ -90,8 +93,13 @@ type OverlayOptionsConfig struct {
 	MountProgram string `toml:"mount_program"`
 	// Size
 	Size string `toml:"size"`
+	// Inodes is used to set a maximum inodes of the container image.
+	Inodes string `toml:"inodes"`
 	// Do not create a bind mount on the storage home
 	SkipMountHome string `toml:"skip_mount_home"`
+	// ForceMask indicates the permissions mask (e.g. "0755") to use for new
+	// files and directories
+	ForceMask string `toml:"force_mask"`
 }
 
 type VfsOptionsConfig struct {
@@ -116,6 +124,13 @@ type OptionsConfig struct {
 	// for shared image content
 	AdditionalImageStores []string `toml:"additionalimagestores"`
 
+	// AdditionalLayerStores is the location of additional read/only
+	// Layer stores.  Usually used to access Networked File System
+	// for shared image content
+	// This API is experimental and can be changed without bumping the
+	// major version number.
+	AdditionalLayerStores []string `toml:"additionallayerstores"`
+
 	// Size
 	Size string `toml:"size"`
 
@@ -126,6 +141,10 @@ type OptionsConfig struct {
 	// IgnoreChownErrors is a flag for whether chown errors should be
 	// ignored when building an image.
 	IgnoreChownErrors string `toml:"ignore_chown_errors"`
+
+	// ForceMask indicates the permissions mask (e.g. "0755") to use for new
+	// files and directories.
+	ForceMask os.FileMode `toml:"force_mask"`
 
 	// RemapUser is the name of one or more entries in /etc/subuid which
 	// should be used to set up default UID mappings.
@@ -172,6 +191,13 @@ type OptionsConfig struct {
 
 	// MountOpt specifies extra mount options used when mounting
 	MountOpt string `toml:"mountopt"`
+
+	// PullOptions specifies options to be handed to pull managers
+	// This API is experimental and can be changed without bumping the major version number.
+	PullOptions map[string]string `toml:"pull_options"`
+
+	// DisableVolatile doesn't allow volatile mounts when it is set.
+	DisableVolatile bool `toml:"disable-volatile"`
 }
 
 // GetGraphDriverOptions returns the driver specific options
@@ -219,6 +245,9 @@ func GetGraphDriverOptions(driverName string, options OptionsConfig) []string {
 		}
 		if options.Thinpool.LogLevel != "" {
 			doptions = append(doptions, fmt.Sprintf("dm.libdm_log_level=%s", options.Thinpool.LogLevel))
+		}
+		if options.Thinpool.MetadataSize != "" {
+			doptions = append(doptions, fmt.Sprintf("dm.metadata_size=%s", options.Thinpool.MetadataSize))
 		}
 		if options.Thinpool.MinFreeSpace != "" {
 			doptions = append(doptions, fmt.Sprintf("dm.min_free_space=%s", options.Thinpool.MinFreeSpace))
@@ -269,11 +298,19 @@ func GetGraphDriverOptions(driverName string, options OptionsConfig) []string {
 		} else if options.Size != "" {
 			doptions = append(doptions, fmt.Sprintf("%s.size=%s", driverName, options.Size))
 		}
-
-		if options.Overlay.SkipMountHome != "" || options.SkipMountHome != "" {
-			logrus.Warn("skip_mount_home option is no longer supported, ignoring option")
+		if options.Overlay.Inodes != "" {
+			doptions = append(doptions, fmt.Sprintf("%s.inodes=%s", driverName, options.Overlay.Inodes))
 		}
-
+		if options.Overlay.SkipMountHome != "" {
+			doptions = append(doptions, fmt.Sprintf("%s.skip_mount_home=%s", driverName, options.Overlay.SkipMountHome))
+		} else if options.SkipMountHome != "" {
+			doptions = append(doptions, fmt.Sprintf("%s.skip_mount_home=%s", driverName, options.SkipMountHome))
+		}
+		if options.Overlay.ForceMask != "" {
+			doptions = append(doptions, fmt.Sprintf("%s.force_mask=%s", driverName, options.Overlay.ForceMask))
+		} else if options.ForceMask != 0 {
+			doptions = append(doptions, fmt.Sprintf("%s.force_mask=%s", driverName, options.ForceMask))
+		}
 	case "vfs":
 		if options.Vfs.IgnoreChownErrors != "" {
 			doptions = append(doptions, fmt.Sprintf("%s.ignore_chown_errors=%s", driverName, options.Vfs.IgnoreChownErrors))

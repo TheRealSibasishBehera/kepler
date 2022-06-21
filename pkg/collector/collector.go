@@ -251,7 +251,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			"Container CPU total energy consumption",
 			[]string{
 				"container_name",
-				"container_namespace",
+				// 	"container_namespace",
 			},
 			nil,
 		)

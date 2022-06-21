@@ -13,6 +13,12 @@ const (
 	oldMaxSize = uint64(1048576)
 )
 
+// getDefaultRootlessNetwork returns the default rootless network configuration.
+// It is "slirp4netns" for Linux.
+func getDefaultRootlessNetwork() string {
+	return "slirp4netns"
+}
+
 // getDefaultProcessLimits returns the nproc for the current process in ulimits format
 // Note that nfile sometimes cannot be set to unlimited, and the limit is hardcoded
 // to (oldMaxSize) 1048576 (2^20), see: http://stackoverflow.com/a/1213069/1811501
@@ -32,10 +38,8 @@ func getDefaultProcessLimits() []string {
 	defaultLimits := []string{}
 	if err := unix.Setrlimit(unix.RLIMIT_NPROC, &rlim); err == nil {
 		defaultLimits = append(defaultLimits, fmt.Sprintf("nproc=%d:%d", rlim.Cur, rlim.Max))
-	} else {
-		if err := unix.Setrlimit(unix.RLIMIT_NPROC, &oldrlim); err == nil {
-			defaultLimits = append(defaultLimits, fmt.Sprintf("nproc=%d:%d", oldrlim.Cur, oldrlim.Max))
-		}
+	} else if err := unix.Setrlimit(unix.RLIMIT_NPROC, &oldrlim); err == nil {
+		defaultLimits = append(defaultLimits, fmt.Sprintf("nproc=%d:%d", oldrlim.Cur, oldrlim.Max))
 	}
 	return defaultLimits
 }
