@@ -66,24 +66,10 @@ func GetSystemProcessName() string {
 	return systemProcessName
 }
 
-//func GetPodNameFromcGgroupID(cGroupID uint64) (string, error) {
-//	info, err := getContainerInfoFromcGgroupID(cGroupID)
-//	return info.PodName, err
-//}
-
-//func GetPodNameSpaceFromcGgroupID(cGroupID uint64) (string, error) {
-//	info, err := getContainerInfoFromcGgroupID(cGroupID)
-//	return info.Namespace, err
-//}
-
 func GetContainerNameFromcGgroupID(cGroupID uint64) (string, error) {
 	info, err := getContainerInfoFromcGgroupID(cGroupID)
 	return info.ContainerName, err
 }
-
-//func GetPodMetrics() (containerCPU map[string]float64, containerMem map[string]float64, nodeCPU float64, nodeMem float64, retErr error) {
-//	return podLister.ListMetrics()
-//}
 
 func getContainerInfoFromcGgroupID(cGroupID uint64) (*ContainerInfo, error) {
 	var err error
