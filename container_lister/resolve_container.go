@@ -20,13 +20,14 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"io/fs"
 	"log"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
+
+	"github.com/containers/podman/v3/pkg/bindings/containers"
 
 	"golang.org/x/sys/unix"
 
@@ -51,6 +52,7 @@ var (
 	cGroupIDToContainerIDCache = map[uint64]string{}
 	containerIDToContainerInfo = map[string]*ContainerInfo{}
 	cGroupIDToPath             = map[uint64]string{}
+	containerIDToInode         = map[string]uint64{}
 	re                         = regexp.MustCompile(`crio-(.*?)\.scope`)
 	cgroupPath                 = "/sys/fs/cgroup"
 	byteOrder                  binary.ByteOrder
@@ -113,7 +115,15 @@ func updateListContainerCache(targetContainerID string, stopWhenFound bool) {
 			//Namespace:     pod.Namespace,
 			ContainerName: container.Names[0],
 		}
+
 		containerID := strings.Trim(container.ID, containerIDPredix)
+
+		ino_val, err := getInodeFromContainerID(containerID)
+		if err != nil {
+			log.Fatalf(err)
+		}
+		containerIDToInode[containerID] = ino_val
+
 		containerIDToContainerInfo[containerID] = info
 		if stopWhenFound && container.ID == targetContainerID {
 			return
@@ -193,15 +203,29 @@ func GetCGroupPathFromContainerID(ctx *context.Context, nameOrID string) string 
 	return CGroupPath
 }
 
-func getInodeOfAFile(fileName string) uint64 {
+func getInodeOfAFile(fileName string) (uint64, error) {
 	var stat syscall.Stat_t
 	if err := syscall.Stat(fileName, &stat); err != nil {
-		panic(err)
+		return 0, fmt.Errorf("Failed to get Inode of file:'%s': %w", fileName, err)
 	}
-	return stat.Ino
+	return stat.Ino, nil
 }
 
-func GetInodefOfCGroup(CGroupPath string) uint64 {
-	ino_val := getInodeOfAFile(CGroupPath)
-	return ino_val
+func GetInodefOfCGroup(CGroupPath string) (uint64, error) {
+	ino_val, err := getInodeOfAFile(CGroupPath)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to get Inode of file:'%s': %w", CGroupPath, err)
+	}
+	return ino_val, nil
+}
+
+func getInodeFromContainerID(containerID string) (uint64, error) {
+	//start the socket
+	ctx := StartingPodmanSocket()
+	cgroupPath := GetCGroupPathFromContainerID(ctx, containerID)
+	ino_val, err := GetInodefOfCGroup(cgroupPath)
+	if err != nil {
+		return ino_val, err
+	}
+	return ino_val, nil
 }
