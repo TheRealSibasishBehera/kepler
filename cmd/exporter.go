@@ -55,12 +55,12 @@ func main() {
 	if modelServerEndpoint != nil {
 		model.SetModelServerEndpoint(*modelServerEndpoint)
 	}
-
+	//new collector
 	collector, err := collector.New()
 	if err != nil {
 		log.Fatalf("failed to create collector: %v", err)
 	}
-	err = collector.Attach()
+	err = collector.Attach() //colector is attached to bpf module
 	if err != nil {
 		log.Fatalf("failed to attach : %v", err)
 	}
