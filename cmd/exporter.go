@@ -23,6 +23,7 @@ import (
 
 	"github.com/sustainable-computing-io/kepler/pkg/collector"
 	"github.com/sustainable-computing-io/kepler/pkg/model"
+	"github.com/sustainable-computing-io/kepler/pkg/pod_lister"
 	"github.com/sustainable-computing-io/kepler/pkg/power/gpu"
 	"github.com/sustainable-computing-io/kepler/pkg/power/rapl"
 
@@ -60,7 +61,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create collector: %v", err)
 	}
-	err = collector.Attach()
+
+	// @TODO Here we need to decice if the system is Kubernetes or podman, and if it's
+	// podman use the podman interface
+	err = collector.Attach(&pod_lister.KubList{})
 	if err != nil {
 		log.Fatalf("failed to attach : %v", err)
 	}
