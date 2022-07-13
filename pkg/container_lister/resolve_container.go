@@ -28,7 +28,6 @@ import (
 	"syscall"
 
 	"github.com/containers/podman/v3/pkg/bindings/containers"
-	"github.com/sustainable-computing-io/kepler/pkg/collector"
 
 	"golang.org/x/sys/unix"
 
@@ -37,30 +36,38 @@ import (
 
 type ContainerInfo struct {
 	ContainerName string
+	ContainerID   string
 }
 
 const (
 	systemProcessName      string = "system_processes"
 	systemProcessNamespace string = "system"
-	containerIDPredix      string = "cri-o://"
-	unknownPath            string = "unknown"
+	// containerIDPredix      string = "cri-o://"
+	unknownPath string = "unknown"
 )
 
 var (
-	contaianerLister           PodmanContainerLister
+	containerLister            PodmanContainerLister
 	cGroupIDToContainerIDCache = map[uint64]string{}
 	containerIDToContainerInfo = map[string]*ContainerInfo{}
-	cGroupIDToPath             = map[uint64]string{}
-	containerIDToInode         = map[string]uint64{}
-	re                         = regexp.MustCompile(`crio-(.*?)\.scope`)
-	cgroupPath                 = "/sys/fs/cgroup"
-	byteOrder                  binary.ByteOrder
+
+	cGroupIDToPath = map[uint64]string{}
+
+	// containerID
+	containerIDToCgroup_id = map[string]uint64{}
+	re                     = regexp.MustCompile(`libpod-(.*?)\.scope`)
+	cgroupPath             = "/sys/fs/cgroup"
+	byteOrder              binary.ByteOrder
+	ctx                    *context.Context
 )
 
 func init() {
 	byteOrder = bpf.GetHostByteOrder()
-	contaianerLister = PodmanContainerLister{}
+	containerLister = PodmanContainerLister{}
 	updateListContainerCache("", false)
+
+	//start the podman socket
+	ctx := StartingPodmanSocket()
 }
 
 func GetSystemProcessName() string {
@@ -72,13 +79,15 @@ func GetContainerNameFromcGgroupID(cGroupID uint64) (string, error) {
 	return info.ContainerName, err
 }
 
+func GetContainerIDFromcGgroupID(cGroupID uint64) (string, error) {
+	info, err := getContainerInfoFromcGgroupID(cGroupID)
+	return info.ContainerID, err
+}
+
 func getContainerInfoFromcGgroupID(cGroupID uint64) (*ContainerInfo, error) {
 	var err error
 	var containerID string
-	info := &ContainerInfo{
-		//PodName:   systemProcessName,
-		//Namespace: systemProcessNamespace,
-	}
+	info := &ContainerInfo{}
 
 	if containerID, err = getContainerIDFromcGroupID(cGroupID); err != nil {
 		//TODO: print a warn with high verbosity
@@ -102,26 +111,31 @@ func getContainerInfoFromcGgroupID(cGroupID uint64) (*ContainerInfo, error) {
 // updateListPodCache updates cache info with all pods and optionally
 // stops the loop when a given container ID is found
 func updateListContainerCache(targetContainerID string, stopWhenFound bool) {
-	containers, err := contaianerLister.ListContainers()
+
+	//get all the containers
+	containers, err := containerLister.ListContainers()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//range over the containers
 	for _, container := range containers {
-		//statuses := container.Status
-		//for _, status := range statuses {
 		info := &ContainerInfo{
-			//PodName:       pod.Name,
-			//Namespace:     pod.Namespace,
 			ContainerName: container.Names[0],
+			ContainerID:   container.ID,
 		}
 
-		containerID := strings.Trim(container.ID, containerIDPredix)
+		// containerID := strings.Trim(container.ID, containerIDPredix)
+		containerID := info.ContainerID
 
-		ino_val, err := getInodeFromContainerID(containerID)
+		Cgroup_path := GetCGroupPathFromContainerID(containerID) // usind default method
+		Cgroup_id, err := GetCGroupIDFromCGroupPath(Cgroup_path)
+
 		if err != nil {
-			log.Fatalf(err)
+			return
 		}
-		containerIDToInode[containerID] = ino_val
+		containerIDToCgroup_id[containerID] = Cgroup_id
+		cGroupIDToContainerIDCache[Cgroup_id] = containerID
 
 		containerIDToContainerInfo[containerID] = info
 		if stopWhenFound && container.ID == targetContainerID {
@@ -145,16 +159,18 @@ func getContainerIDFromcGroupID(cGroupID uint64) (string, error) {
 	if re.MatchString(path) {
 		sub := re.FindAllString(path, -1)
 		for _, element := range sub {
-			if strings.Contains(element, "-conmon-") || strings.Contains(element, ".service") {
-				return "", fmt.Errorf("process cGroupID %d is not in a kubernetes pod", cGroupID)
-			} else if strings.Contains(element, "crio") {
-				containerID := strings.Trim(element, "crio-")
+			// if strings.Contains(element, "-conmon-") || strings.Contains(element, ".service") {
+			// 	return "", fmt.Errorf("process cGroupID %d is not in a kubernetes pod", cGroupID)
+			// } else
+			if strings.Contains(element, "libpod") {
+				containerID := strings.Trim(element, "libpod-")
 				containerID = strings.Trim(containerID, ".scope")
 				cGroupIDToContainerIDCache[cGroupID] = containerID
 				return cGroupIDToContainerIDCache[cGroupID], nil
 			}
 		}
 	}
+
 	cGroupIDToContainerIDCache[cGroupID] = systemProcessName
 	return cGroupIDToContainerIDCache[cGroupID], fmt.Errorf("failed to find container with cGroup id: %v", cGroupID)
 }
@@ -162,6 +178,29 @@ func getContainerIDFromcGroupID(cGroupID uint64) (string, error) {
 // getPathFromcGroupID uses cgroupfs to get cgroup path from id
 // it needs cgroup v2 (per https://github.com/iovisor/bpftrace/issues/950) and kernel 4.18+ (https://github.com/torvalds/linux/commit/bf6fa2c893c5237b48569a13fa3c673041430b6c)
 func getPathFromcGroupID(cgroupId uint64) (string, error) {
+
+	// // METHOD 2
+	// GET CONTAINER ID FROM CGROUP ID
+	// // USE ID to get path{note that this only applicable if the purpose is to find path of container}
+
+	//check if cgroup if has a container associated , if ok then get path
+	if p, ok := cGroupIDToContainerIDCache[cgroupId]; ok {
+		return GetCGroupPathFromContainerID(p), nil
+	}
+
+	//if not found try to update cache
+	container_info, err1 := getContainerInfoFromcGgroupID(cgroupId)
+	if err1 != nil {
+		fmt.Errorf("%s", err1)
+	}
+	container_id := container_info.ContainerID
+	updateListContainerCache(container_id, true)
+
+	// check again
+	if p, ok := cGroupIDToContainerIDCache[cgroupId]; ok {
+		return GetCGroupPathFromContainerID(p), nil
+	}
+
 	if p, ok := cGroupIDToPath[cgroupId]; ok {
 		return p, nil
 	}
@@ -193,42 +232,38 @@ func getPathFromcGroupID(cgroupId uint64) (string, error) {
 	return cGroupIDToPath[cgroupId], nil
 }
 
-func GetCGroupPathFromContainerID(ctx *context.Context, nameOrID string) string {
+// update
+
+//get CgroupPath from the containerID
+func GetCGroupPathFromContainerID(nameOrID string) string {
+
 	data, err := containers.Inspect(*ctx, nameOrID, nil)
 	if err != nil {
 		log.Fatalf("cannot get container:%v", err)
 	}
 	CGroupPath := data.State.CgroupPath
-	return CGroupPath
+
+	return cgroupPath + CGroupPath
+
 }
 
-func getInodeOfAFile(fileName string) (uint64, error) {
+//get CGroupID of A file using inode
+func getCGroupIDOfAFile(filePath string) (uint64, error) {
 	var stat syscall.Stat_t
-	if err := syscall.Stat(fileName, &stat); err != nil {
-		return 0, fmt.Errorf("Failed to get Inode of file:'%s': %w", fileName, err)
+	if err := syscall.Stat(filePath, &stat); err != nil {
+		return 0, fmt.Errorf("Failed to get Inode of file:'%s': %w", filePath, err)
 	}
 	return stat.Ino, nil
 }
 
-func GetInodefOfCGroup(CGroupPath string) (uint64, error) {
-	ino_val, err := getInodeOfAFile(CGroupPath)
+func GetCGroupIDFromCGroupPath(CGroupPath string) (uint64, error) {
+	ino_val, err := getCGroupIDOfAFile(CGroupPath)
 	if err != nil {
 		return 0, fmt.Errorf("Failed to get Inode of file:'%s': %w", CGroupPath, err)
 	}
 	return ino_val, nil
 }
 
-func (collector.ContainerEnergy) getInodeFromContainerID(containerID string) (uint64, error) {
-	//start the socket
-	ctx := StartingPodmanSocket()
-	cgroupPath := GetCGroupPathFromContainerID(ctx, containerID)
-	ino_val, err := GetInodefOfCGroup(cgroupPath)
-	if err != nil {
-		return ino_val, err
-	}
-	return ino_val, nil
-}
+// func (collector.ContainerEnergy) GetNameFromcGgroupID() (cgroupID uint64) {
 
-func (collector.ContainerEnergy) GetNameFromcGgroupID() (cgroupID uint64) {
-
-}
+// }
