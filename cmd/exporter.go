@@ -36,6 +36,7 @@ var (
 	address             = flag.String("address", "0.0.0.0:8888", "bind address")
 	metricsPath         = flag.String("metrics-path", "/metrics", "metrics path")
 	enableGPU           = flag.Bool("enable-gpu", false, "whether enable gpu (need to have libnvidia-ml installed)")
+	isOnlyContainer     = flag.Bool("only-container", false, "whether isOnlyContainer to implement container_lister")
 	modelServerEndpoint = flag.String("model-server-endpoint", "", "model server endpoint")
 )
 
@@ -64,10 +65,21 @@ func main() {
 
 	// @TODO Here we need to decice if the system is Kubernetes or podman, and if it's
 	// podman use the podman interface
-	err = collector.Attach(&pod_lister.KubList{})
-	if err != nil {
-		log.Fatalf("failed to attach : %v", err)
+	if *isOnlyContainer {
+		err = collector.Attach(&pod_lister.PodmanList{})
+		if err != nil {
+			log.Fatalf("failed to attach : %v", err)
+		}
+	} else {
+		err = collector.Attach(&pod_lister.KubList{})
+		if err != nil {
+			log.Fatalf("failed to attach : %v", err)
+		}
 	}
+	// err = collector.Attach(&pod_lister.KubList{})
+	// if err != nil {
+	// 	log.Fatalf("failed to attach : %v", err)
+	// }
 	defer collector.Destroy()
 	defer rapl.StopPower()
 

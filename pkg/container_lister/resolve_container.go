@@ -150,9 +150,17 @@ func getContainerIDFromcGroupID(cGroupID uint64) (string, error) {
 		return id, nil
 	}
 
+	//added another search using
+	p, err1 := GetContainerIDFromcGgroupID(cGroupID)
+	if err1 != nil {
+		log.Fatal(err1)
+	} else {
+		return p, nil
+	}
+
 	var err error
 	var path string
-	if path, err = getPathFromcGroupID(cGroupID); err != nil {
+	if path, err = GetPathFromcGroupID(cGroupID); err != nil {
 		return systemProcessName, err
 	}
 
@@ -175,9 +183,9 @@ func getContainerIDFromcGroupID(cGroupID uint64) (string, error) {
 	return cGroupIDToContainerIDCache[cGroupID], fmt.Errorf("failed to find container with cGroup id: %v", cGroupID)
 }
 
-// getPathFromcGroupID uses cgroupfs to get cgroup path from id
+// GetPathFromcGroupID uses cgroupfs to get cgroup path from id
 // it needs cgroup v2 (per https://github.com/iovisor/bpftrace/issues/950) and kernel 4.18+ (https://github.com/torvalds/linux/commit/bf6fa2c893c5237b48569a13fa3c673041430b6c)
-func getPathFromcGroupID(cgroupId uint64) (string, error) {
+func GetPathFromcGroupID(cgroupId uint64) (string, error) {
 
 	// // METHOD 2
 	// GET CONTAINER ID FROM CGROUP ID
@@ -231,8 +239,6 @@ func getPathFromcGroupID(cgroupId uint64) (string, error) {
 	cGroupIDToPath[cgroupId] = unknownPath
 	return cGroupIDToPath[cgroupId], nil
 }
-
-// update
 
 //get CgroupPath from the containerID
 func GetCGroupPathFromContainerID(nameOrID string) string {

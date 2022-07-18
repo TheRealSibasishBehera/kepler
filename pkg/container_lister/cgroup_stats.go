@@ -40,7 +40,7 @@ func ReadAllCgroupIOStat() (uint64, uint64, int, error) {
 }
 
 func ReadCgroupIOStat(cGroupID uint64) (uint64, uint64, int, error) {
-	path, err := getPathFromcGroupID(cGroupID)
+	path, err := GetPathFromcGroupID(cGroupID)
 	if err != nil {
 		return 0, 0, 0, err
 	}
