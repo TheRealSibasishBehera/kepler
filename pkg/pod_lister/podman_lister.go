@@ -14,11 +14,15 @@ func (k *PodmanList) GetSystemProcessName() string {
 	return systemProcessName
 }
 
+//1
 func (k *PodmanList) GetPodNameFromcGgroupID(cGroupID uint64) (string, error) {
 
 	info, err := container_lister.GetContainerNameFromcGgroupID(cGroupID)
 	if err != nil {
 		return "", err
+	}
+	if info == "unknown" {
+		return "systemProcess", nil
 	}
 	return info, nil
 
@@ -37,8 +41,7 @@ func (k *PodmanList) GetPodContainerNameFromcGgroupID(cGroupID uint64) (string, 
 
 func (k *PodmanList) ReadAllCgroupIOStat() (uint64, uint64, int, error) {
 
-	//works same for for both pod and containers
-	return readIOStat(cgroupPath)
+	return container_lister.ReadIOStat(cgroupPath)
 
 }
 
@@ -48,7 +51,7 @@ func (k *PodmanList) ReadCgroupIOStat(cGroupID uint64) (uint64, uint64, int, err
 		return 0, 0, 0, err
 	}
 	if strings.Contains(path, "libpod-") {
-		return readIOStat(path)
+		return container_lister.ReadIOStat(cgroupPath + path)
 	}
 	return 0, 0, 0, fmt.Errorf("no cgroup path found")
 

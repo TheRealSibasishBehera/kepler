@@ -26,8 +26,6 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
-
-	bpf "github.com/iovisor/gobpf/bcc"
 )
 
 type ContainerInfo struct {
@@ -54,9 +52,14 @@ var (
 )
 
 func init() {
-	byteOrder = bpf.GetHostByteOrder() //1
-	podLister = KubeletPodLister{}     //1
-	updateListPodCache("", false)
+	fmt.Println("podlister resolve init")
+	//fmt.Println("x")
+	// byteOrder = bpf.GetHostByteOrder() //1
+	//fmt.Println("x+")
+	//podLister = KubeletPodLister{} //1
+	//fmt.Println("y+")
+	//updateListPodCache("", false)
+	fmt.Println("podlister resolve init over")
 }
 
 func GetSystemProcessName() string {

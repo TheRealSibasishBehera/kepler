@@ -53,6 +53,7 @@ var (
 )
 
 func init() {
+	fmt.Println("podlister kubelet_pod_lister init")
 	nodeName := os.Getenv(nodeEnv)
 	if len(nodeName) == 0 {
 		nodeName = "localhost"
@@ -63,9 +64,12 @@ func init() {
 	}
 	podUrl = "https://" + nodeName + ":" + port + "/pods"
 	metricsUrl = "https://" + nodeName + ":" + port + "/metrics/resource"
+
+	fmt.Println("podlister kubelet_pod_lister init over")
 }
 
 func httpGet(url string) (*http.Response, error) {
+	fmt.Println("httpGet called")
 	objToken, err := ioutil.ReadFile(saPath)
 	if err != nil {
 		log.Fatalf("failed to read from %q: %v", saPath, err)
@@ -89,6 +93,7 @@ func httpGet(url string) (*http.Response, error) {
 
 // ListPods accesses Kubelet's metrics and obtain PodList
 func (k *KubeletPodLister) ListPods() (*[]corev1.Pod, error) {
+	fmt.Println("ListPods called")
 	resp, err := httpGet(podUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get response: %v", err)
@@ -111,6 +116,7 @@ func (k *KubeletPodLister) ListPods() (*[]corev1.Pod, error) {
 
 // ListMetrics accesses Kubelet's metrics and obtain pods and node metrics
 func (k *KubeletPodLister) ListMetrics() (containerCPU map[string]float64, containerMem map[string]float64, nodeCPU float64, nodeMem float64, retErr error) {
+	fmt.Println("ListMetrics called")
 	resp, err := httpGet(metricsUrl)
 	if err != nil {
 		retErr = fmt.Errorf("failed to get response: %v", err)
@@ -163,6 +169,7 @@ func (k *KubeletPodLister) ListMetrics() (containerCPU map[string]float64, conta
 }
 
 func parseLabels(labels []*dto.LabelPair) (namespace, pod string) {
+	fmt.Println("parseLabels called")
 	for _, v := range labels {
 		if v.GetName() == podNameTag {
 			pod = v.GetValue()

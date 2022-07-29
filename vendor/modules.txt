@@ -68,11 +68,6 @@ github.com/containernetworking/cni/pkg/version
 github.com/containernetworking/plugins/pkg/ns
 # github.com/containers/buildah v1.23.1
 github.com/containers/buildah/define
-github.com/containers/buildah/manifests
-github.com/containers/buildah/pkg/cli
-github.com/containers/buildah/pkg/completion
-github.com/containers/buildah/pkg/parse
-github.com/containers/buildah/pkg/sshagent
 # github.com/containers/common v0.44.5
 github.com/containers/common/libimage
 github.com/containers/common/libimage/manifests
@@ -80,7 +75,6 @@ github.com/containers/common/pkg/apparmor
 github.com/containers/common/pkg/apparmor/internal/supported
 github.com/containers/common/pkg/capabilities
 github.com/containers/common/pkg/cgroupv2
-github.com/containers/common/pkg/completion
 github.com/containers/common/pkg/config
 github.com/containers/common/pkg/filters
 github.com/containers/common/pkg/flag
@@ -101,7 +95,6 @@ github.com/containers/image/v5/docker/daemon
 github.com/containers/image/v5/docker/internal/tarfile
 github.com/containers/image/v5/docker/policyconfiguration
 github.com/containers/image/v5/docker/reference
-github.com/containers/image/v5/docker/tarfile
 github.com/containers/image/v5/image
 github.com/containers/image/v5/internal/blobinfocache
 github.com/containers/image/v5/internal/iolimits
@@ -139,24 +132,6 @@ github.com/containers/image/v5/transports
 github.com/containers/image/v5/transports/alltransports
 github.com/containers/image/v5/types
 github.com/containers/image/v5/version
-# github.com/containers/libpod v1.9.3
-## explicit
-github.com/containers/libpod/cmd/podman/cliconfig
-github.com/containers/libpod/libpod/define
-github.com/containers/libpod/libpod/driver
-github.com/containers/libpod/libpod/events
-github.com/containers/libpod/libpod/image
-github.com/containers/libpod/pkg/cgroups
-github.com/containers/libpod/pkg/errorhandling
-github.com/containers/libpod/pkg/inspect
-github.com/containers/libpod/pkg/namespaces
-github.com/containers/libpod/pkg/registries
-github.com/containers/libpod/pkg/rootless
-github.com/containers/libpod/pkg/signal
-github.com/containers/libpod/pkg/timetype
-github.com/containers/libpod/pkg/util
-github.com/containers/libpod/utils
-github.com/containers/libpod/version
 # github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b
 github.com/containers/libtrust
 # github.com/containers/ocicrypt v1.1.2
@@ -385,7 +360,6 @@ github.com/mattn/go-runewidth
 # github.com/mattn/go-shellwords v1.0.12
 github.com/mattn/go-shellwords
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
-## explicit
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/miekg/pkcs11 v1.0.3
 github.com/miekg/pkcs11
@@ -467,9 +441,6 @@ github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
 github.com/opencontainers/selinux/pkg/pwalkdir
-# github.com/opentracing/opentracing-go v1.1.0
-github.com/opentracing/opentracing-go
-github.com/opentracing/opentracing-go/log
 # github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913
 github.com/ostreedev/ostree-go/pkg/glibobject
 github.com/ostreedev/ostree-go/pkg/otbuiltin

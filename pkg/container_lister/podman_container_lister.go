@@ -41,9 +41,11 @@ func StartingPodmanSocket() *context.Context {
 	return &ctx
 }
 
-func (k *PodmanContainerLister) ListContainers() ([]entities.ListContainer, error) {
-	ctx := StartingPodmanSocket()
-	containerList, err := containers.List(*ctx, nil)
+//6
+func (k *PodmanContainerLister) ListContainers(contxt *context.Context) ([]entities.ListContainer, error) {
+	fmt.Println(6)
+	//ctx := StartingPodmanSocket()
+	containerList, err := containers.List(*contxt, nil)
 
 	if err != nil {
 		log.Fatalf("cannot get pods:%v", err)
