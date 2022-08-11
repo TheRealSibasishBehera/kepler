@@ -53,7 +53,6 @@ var (
 )
 
 func init() {
-	fmt.Println("podlister kubelet_pod_lister init")
 	nodeName := os.Getenv(nodeEnv)
 	if len(nodeName) == 0 {
 		nodeName = "localhost"
@@ -64,8 +63,6 @@ func init() {
 	}
 	podUrl = "https://" + nodeName + ":" + port + "/pods"
 	metricsUrl = "https://" + nodeName + ":" + port + "/metrics/resource"
-
-	fmt.Println("podlister kubelet_pod_lister init over")
 }
 
 func httpGet(url string) (*http.Response, error) {

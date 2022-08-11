@@ -2,7 +2,6 @@ package container_lister
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/containers/podman/v3/pkg/bindings"
@@ -30,10 +29,9 @@ var (
 type PodmanContainerLister struct{}
 
 func StartingPodmanSocket() *context.Context {
-	fmt.Println("Starting")
 	ctx, err := bindings.NewConnection(context.Background(), "unix:/run/podman/podman.sock")
 	if err != nil {
-		log.Fatalf("cannot connect to podman :%v", err)
+		log.Printf("cannot connect to podman :%v", err)
 	}
 	return &ctx
 }
@@ -43,7 +41,7 @@ func (k *PodmanContainerLister) ListContainers(contxt *context.Context) ([]entit
 	containerList, err := containers.List(*contxt, nil)
 
 	if err != nil {
-		log.Fatalf("cannot get pods:%v", err)
+		log.Printf("cannot get pods:%v", err)
 	}
 	return containerList, nil
 }

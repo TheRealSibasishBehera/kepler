@@ -52,14 +52,9 @@ var (
 )
 
 func init() {
-	fmt.Println("podlister resolve init")
-	//fmt.Println("x")
 	// byteOrder = bpf.GetHostByteOrder() //1
-	//fmt.Println("x+")
 	//podLister = KubeletPodLister{} //1
-	//fmt.Println("y+")
 	//updateListPodCache("", false)
-	fmt.Println("podlister resolve init over")
 }
 
 func GetSystemProcessName() string {
