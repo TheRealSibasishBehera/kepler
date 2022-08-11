@@ -35,38 +35,28 @@ var (
 	reIO = regexp.MustCompile(reIOStat)
 )
 
-//167
 func ReadAllCgroupIOStat() (uint64, uint64, int, error) {
 	return ReadIOStat(cgroupPathInitial)
 }
 
-//269
 func ReadCgroupIOStat(cGroupID uint64) (uint64, uint64, int, error) {
-	fmt.Println("269 start")
-	fmt.Println("269 start path call")
 	path, err := GetPathFromcGroupID(cGroupID)
 	if err != nil {
-		fmt.Println("269 over fail")
 		return 0, 0, 0, err
 	}
 	if strings.Contains(path, "libpod-") {
-		fmt.Println("269 over success")
 		return ReadIOStat(cgroupPathInitial + path)
 	}
-	fmt.Println("YoYoYoYoYo")
 	return 0, 0, 0, fmt.Errorf("no cgroup path found")
 }
 
-//369
 func ReadIOStat(cgroupPath string) (uint64, uint64, int, error) {
-	fmt.Println("369 start")
 	rBytes := uint64(0)
 	wBytes := uint64(0)
 	disks := 0
 	path := filepath.Join(cgroupPath, ioStatFile)
 	file, err := os.Open(path)
 	if err != nil {
-		fmt.Println("369 end fail")
 		return 0, 0, 0, err
 	}
 	defer file.Close()
@@ -93,15 +83,12 @@ func ReadIOStat(cgroupPath string) (uint64, uint64, int, error) {
 			}
 		}
 	}
-	fmt.Printf("path %s read %d write %d ", cgroupPath, rBytes, wBytes)
-	fmt.Println("369 end success")
+	// fmt.Printf("path %s read %d write %d ", cgroupPath, rBytes, wBytes)
 	return rBytes, wBytes, disks, err
 }
 
 func isVirtualDisk(major string) bool {
-	if major == "253" { // device-mapper
-		return true
-	}
+	// device-mapper
+	return major == "253"
 	//TODO add other virtual device
-	return false
 }

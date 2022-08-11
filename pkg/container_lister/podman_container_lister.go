@@ -29,9 +29,6 @@ var (
 
 type PodmanContainerLister struct{}
 
-//type ContainerData struct {
-//}
-
 func StartingPodmanSocket() *context.Context {
 	fmt.Println("Starting")
 	ctx, err := bindings.NewConnection(context.Background(), "unix:/run/podman/podman.sock")
@@ -41,18 +38,12 @@ func StartingPodmanSocket() *context.Context {
 	return &ctx
 }
 
-//6
 func (k *PodmanContainerLister) ListContainers(contxt *context.Context) ([]entities.ListContainer, error) {
-	fmt.Println(6)
-	//ctx := StartingPodmanSocket()
+
 	containerList, err := containers.List(*contxt, nil)
 
 	if err != nil {
 		log.Fatalf("cannot get pods:%v", err)
 	}
 	return containerList, nil
-}
-
-func main() {
-
 }

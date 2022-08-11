@@ -124,32 +124,21 @@ func init() {
 	}
 }
 
-//899
 func (c *Collector) reader(podList pod_lister.PodLister) {
-	fmt.Println("899 reader reader called")
 	ticker := time.NewTicker(samplePeriod)
 	go func() {
 
-		fmt.Println("899 go routines called")
-
 		lastEnergyCore, _ := rapl.GetEnergyFromCore()
 		lastEnergyDram, _ := rapl.GetEnergyFromDram()
-		fmt.Println("rapl core and dram over")
-		_ = gpu.GetGpuEnergy() // reset power usage counter
-
+		_ = gpu.GetGpuEnergy()
 		acpiPowerMeter.Run()
-		fmt.Println("acpi powermeter started")
 		for {
-			fmt.Println("899 at ticker ")
 			select {
 
 			case <-ticker.C:
 
-				fmt.Println("start")
-
 				cpuFrequency = acpiPowerMeter.GetCPUCoreFrequency()
 				nodeEnergy, _ = acpiPowerMeter.GetEnergyFromHost()
-				fmt.Println("899 power meter GetCPUCoreFrequency  GetEnergyFromHost over ")
 
 				var aggCPUTime, avgFreq, totalCPUTime float64
 				var aggCPUCycles, aggCPUInstr, aggCacheMisses, aggBytesRead, aggBytesWrite uint64
@@ -157,28 +146,24 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 				totalCPUTime = 0
 				energyCore, err := rapl.GetEnergyFromCore()
 
-				fmt.Println("899 GetEnergyFromCore over ")
-
 				if err != nil {
-					log.Printf("899 failed to get core power: %v\n", err)
+					log.Printf("failed to get core power: %v\n", err)
 					continue
 				}
 				energyDram, err := rapl.GetEnergyFromDram()
 
-				fmt.Println("899 GetEnergyFromDram over ")
-
 				if err != nil {
-					log.Printf("899 failed to get dram power: %v\n", err)
+					log.Printf("failed to get dram power: %v\n", err)
 					continue
 				}
 				if energyCore < lastEnergyCore || energyDram < lastEnergyDram {
-					log.Printf("899 failed to get latest core or dram energy. Core energy %v should be more than %v; Dram energy %v should be more than %v\n",
+					log.Printf("failed to get latest core or dram energy. Core energy %v should be more than %v; Dram energy %v should be more than %v\n",
 						energyCore, lastEnergyCore, energyDram, lastEnergyDram)
 				}
 				coreDelta := float64(energyCore - lastEnergyCore)
 				dramDelta := float64(energyDram - lastEnergyDram)
 				if coreDelta == 0 && dramDelta == 0 {
-					log.Printf("899 power reading not changed, retry\n")
+					log.Printf("power reading not changed, retry\n")
 					continue
 				}
 				gpuDelta := float64(0)
@@ -188,12 +173,11 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 				lastEnergyCore = energyCore
 				lastEnergyDram = energyDram
 
-				// calculate the total energy consumed in node from all sensors
 				var nodeEnergyTotal float64 = 0
 				for _, energy := range nodeEnergy {
 					nodeEnergyTotal += energy
 				}
-				// ccalculate the other energy consumed besides CPU/GPU and memory
+
 				otherDelta := float64(0)
 				if nodeEnergyTotal > 0 {
 					otherDelta = nodeEnergyTotal - coreDelta - dramDelta - gpuDelta
@@ -220,7 +204,6 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 					v.CurrBytesWrite = 0
 				}
 				for it := c.modules.Table.Iter(); it.Next(); {
-					fmt.Println("ebpf modules iterated ")
 					data := it.Leaf()
 					err := binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &ct)
 					if err != nil {
@@ -229,37 +212,19 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 					}
 					comm := (*C.char)(unsafe.Pointer(&ct.Command))
 
-					fmt.Println("**********************************************")
-					fmt.Println("**********************************************")
-					fmt.Printf("pid %v cgroup %v cmd %v\n", ct.PID, ct.CGroupPID, C.GoString(comm))
-					fmt.Println("**********************************************")
-					fmt.Println("**********************************************")
-
 					// fmt.Printf("pid %v cgroup %v cmd %v\n", ct.PID, ct.CGroupPID, C.GoString(comm))
-					fmt.Println("1 699 GetPodNameFromcGgroupID called")
 					podName, err := podList.GetPodNameFromcGgroupID(ct.CGroupPID)
 					if err != nil {
-						log.Printf("699 failed to resolve pod for cGroup ID %v: %v", ct.CGroupPID, err)
+						log.Printf("failed to resolve pod for cGroup ID %v: %v", ct.CGroupPID, err)
 						continue
 					}
 
-					// if err == nil {
-					// 	fmt.Println("Yeah error is nil")
-					// 	fmt.Println("+++++++")
-					// 	fmt.Println("podName : %v", podEnergy[podName])
-					// 	fmt.Println("+++++++")
-					// }
-
 					if _, ok := podEnergy[podName]; !ok {
-						fmt.Println("699 yes")
 						podEnergy[podName] = &PodEnergy{}
 						podEnergy[podName].PodName = podName
-						fmt.Println("}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}")
-						fmt.Printf("699 podName : %v \n", podName)
-						fmt.Println("}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}")
 						podNamespace, err := podList.GetPodNameSpaceFromcGgroupID(ct.CGroupPID)
 						if err != nil {
-							log.Printf("699 failed to find namespace for cGroup ID %v: %v", ct.CGroupPID, err)
+							log.Printf("failed to find namespace for cGroup ID %v: %v", ct.CGroupPID, err)
 							podNamespace = "unknown"
 						}
 						podEnergy[podName].Namespace = podNamespace
@@ -268,13 +233,7 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 						podEnergy[podName].Command = C.GoString(comm)
 					}
 					if attacher.EnableCPUFreq {
-						fmt.Println("699 trying to get getAVGCPUFreqAndTotalCPUTime")
-
 						avgFreq, totalCPUTime = getAVGCPUFreqAndTotalCPUTime(cpuFrequency, ct.CPUTime)
-						fmt.Printf("average frequeny : %v", avgFreq)
-						fmt.Printf("total cpu time  : %v", totalCPUTime)
-
-						fmt.Println("699 trying to get getAVGCPUFreqAndTotalCPUTime over ")
 					} else {
 						totalCPUTime = float64(ct.ProcessRunTime)
 					}
@@ -298,16 +257,10 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 
 					podEnergy[podName].AvgCPUFreq = avgFreq
 					if e, ok := gpuEnergy[uint32(ct.PID)]; ok {
-
-						fmt.Println("trying to get GPU stats")
-
-						fmt.Printf("gpu energy pod %v comm %v pid %v: %v\n", podName, C.GoString(comm), ct.PID, e)
-
-						fmt.Println(" get GPU stats over")
+						//fmt.Printf("gpu energy pod %v comm %v pid %v: %v\n", podName, C.GoString(comm), ct.PID, e)
 						podEnergy[podName].CurrEnergyInGPU += uint64(e)
 						podEnergy[podName].AggEnergyInGPU += podEnergy[podName].CurrEnergyInGPU
 					}
-					fmt.Println("try to read IO stats complete ")
 
 					rBytes, wBytes, disks, err := podList.ReadCgroupIOStat(ct.CGroupPID)
 
@@ -360,8 +313,8 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 					fmt.Printf("failed to get kubelet metrics: %v", err)
 				}
 
-				log.Printf("energy count: core %.2f dram: %.2f time %.6f cycles %d instructions %d misses %d node memory %f\n",
-					coreDelta, dramDelta, aggCPUTime, aggCPUCycles, aggCPUInstr, aggCacheMisses, nodeMem)
+				// log.Printf("energy count: core %.2f dram: %.2f time %.6f cycles %d instructions %d misses %d node memory %f\n",
+				// 	coreDelta, dramDelta, aggCPUTime, aggCPUCycles, aggCPUInstr, aggCacheMisses, nodeMem)
 				currNodeEnergy = &CurrNodeEnergy{
 					CPUTime:       aggCPUTime,
 					CPUCycles:     aggCPUCycles,
