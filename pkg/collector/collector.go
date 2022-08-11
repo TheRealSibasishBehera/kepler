@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"github.com/sustainable-computing-io/kepler/pkg/attacher"
+	"github.com/sustainable-computing-io/kepler/pkg/pod_lister"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -33,13 +34,13 @@ func New() (*Collector, error) {
 	return &Collector{}, nil
 }
 
-func (c *Collector) Attach() error {
+func (c *Collector) Attach(podList pod_lister.PodLister) error {
 	m, err := attacher.AttachBPFAssets()
 	if err != nil {
 		return fmt.Errorf("failed to attach bpf assets: %v", err)
 	}
 	c.modules = m
-	c.reader()
+	c.reader(podList)
 	return nil
 }
 

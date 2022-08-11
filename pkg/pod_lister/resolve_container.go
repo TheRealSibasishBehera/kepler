@@ -26,8 +26,6 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
-
-	bpf "github.com/iovisor/gobpf/bcc"
 )
 
 type ContainerInfo struct {
@@ -54,9 +52,9 @@ var (
 )
 
 func init() {
-	byteOrder = bpf.GetHostByteOrder()
-	podLister = KubeletPodLister{}
-	updateListPodCache("", false)
+	// byteOrder = bpf.GetHostByteOrder() //1
+	//podLister = KubeletPodLister{} //1
+	//updateListPodCache("", false)
 }
 
 func GetSystemProcessName() string {
@@ -116,14 +114,19 @@ func updateListPodCache(targetContainerID string, stopWhenFound bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//loops over all the pods recieved
 	for _, pod := range *pods {
 		statuses := pod.Status.ContainerStatuses
 		for _, status := range statuses {
+
+			// setting info as a ContainerInfo type
 			info := &ContainerInfo{
 				PodName:       pod.Name,
 				Namespace:     pod.Namespace,
 				ContainerName: status.Name,
 			}
+			//gets container ID
 			containerID := strings.Trim(status.ContainerID, containerIDPredix)
 			containerIDToContainerInfo[containerID] = info
 			if stopWhenFound && status.ContainerID == targetContainerID {

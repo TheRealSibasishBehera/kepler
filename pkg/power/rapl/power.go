@@ -48,6 +48,7 @@ func init() {
 	if sysfsImpl.IsSupported() /*&& false*/ {
 		fmt.Println("use sysfs to obtain power")
 		powerImpl = sysfsImpl
+		fmt.Println("use sysfs to obtain power over")
 	} else {
 		if msrImpl.IsSupported() && useMSR {
 			fmt.Println("use MSR to obtain power")

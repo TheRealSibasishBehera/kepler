@@ -1,0 +1,21 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/sibasishbehera/kepler'
+ 
+make _build_containerized ARCH=amd64
+ 
+make[1]: Entering directory '/home/sibasishbehera/kepler'
+ 
+if [ -z '/usr/bin/podman' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $PATH' >&2 && exit 1; fi
+echo BIN_TIMESTAMP==2022-07-27T13:41:03Z
+/usr/bin/podman build -t quay.io/sustainable_computing_io/kepler:v0.2-153-gec5300f-linux-amd64 \
+	-f "/home/sibasishbehera/kepler"/build/Dockerfile \
+	--build-arg SOURCE_GIT_TAG=v0.2-153-gec5300f \
+	--build-arg BIN_TIMESTAMP=2022-07-27T13:41:03Z \
+	--build-arg ARCH=amd64 \
+	--build-arg MAKE_TARGET="cross-build-linux-amd64" \
+	--platform="linux/amd64" \
+	.
+/usr/bin/podman tag quay.io/sustainable_computing_io/kepler:v0.2-153-gec5300f-linux-amd64 quay.io/sustainable_computing_io/kepler:latest
+make[1]: Leaving directory '/home/sibasishbehera/kepler'
+make: Leaving directory '/home/sibasishbehera/kepler'
+ 

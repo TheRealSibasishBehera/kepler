@@ -1,53 +1,56 @@
-/*
-Copyright 2021.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+///*
+//Copyright 2021.
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+////
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//Unless required by applicable law or agreed to in writing, software
+//distributed under the License is distributed on an "AS IS" BASIS,
+//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//See the License for the specific language governing permissions and
+//limitations under the License.
+//*/
 
 package main
 
 import (
 	"flag"
-	"log"
-	"net/http"
-
-	"github.com/sustainable-computing-io/kepler/pkg/collector"
-	"github.com/sustainable-computing-io/kepler/pkg/model"
-	"github.com/sustainable-computing-io/kepler/pkg/power/gpu"
-	"github.com/sustainable-computing-io/kepler/pkg/power/rapl"
-
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
+	"github.com/sustainable-computing-io/kepler/pkg/collector"
+	"github.com/sustainable-computing-io/kepler/pkg/model"
+	"github.com/sustainable-computing-io/kepler/pkg/pod_lister"
+	"log"
+	"net/http"
+
+	"github.com/sustainable-computing-io/kepler/pkg/power/gpu"
+	"github.com/sustainable-computing-io/kepler/pkg/power/rapl"
 )
 
 var (
 	address             = flag.String("address", "0.0.0.0:8888", "bind address")
 	metricsPath         = flag.String("metrics-path", "/metrics", "metrics path")
 	enableGPU           = flag.Bool("enable-gpu", false, "whether enable gpu (need to have libnvidia-ml installed)")
+	isOnlyContainer     = flag.Bool("only-container", true, "whether isOnlyContainer to implement container_lister")
 	modelServerEndpoint = flag.String("model-server-endpoint", "", "model server endpoint")
 )
 
 func main() {
 	flag.Parse()
 
+	//register the collector
 	err := prometheus.Register(version.NewCollector("energy_stats_exporter"))
 	if err != nil {
 		log.Fatalf("failed to register : %v", err)
 	}
 
 	if *enableGPU {
-		err = gpu.Init()
+		err := gpu.Init()
 		if err == nil {
 			defer gpu.Shutdown()
 		}
@@ -60,13 +63,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create collector: %v", err)
 	}
-	err = collector.Attach()
-	if err != nil {
-		log.Fatalf("failed to attach : %v", err)
+
+	if *isOnlyContainer {
+		fmt.Println("only container started")
+		err = collector.Attach(&pod_lister.PodmanList{})
+		if err != nil {
+			log.Fatalf("failed to attach : %v", err)
+		}
+		fmt.Println("attach over")
+	} else {
+		err = collector.Attach(&pod_lister.KubList{})
+		if err != nil {
+			log.Fatalf("failed to attach : %v", err)
+		}
 	}
+
 	defer collector.Destroy()
 	defer rapl.StopPower()
 
+	//register a collector
 	err = prometheus.Register(collector)
 	if err != nil {
 		log.Fatalf("failed to register collector: %v", err)
@@ -85,9 +100,10 @@ func main() {
 			log.Fatalf("failed to write response: %v", err)
 		}
 	})
-
+	//
 	err = http.ListenAndServe(*address, nil)
 	if err != nil {
 		log.Fatalf("failed to bind on %s: %v", *address, err)
 	}
+	fmt.Println("exporter call over")
 }

@@ -124,7 +124,7 @@ func init() {
 	}
 }
 
-func (c *Collector) reader() {
+func (c *Collector) reader(podList pod_lister.PodLister) {
 	ticker := time.NewTicker(samplePeriod)
 	go func() {
 		lastEnergyCore, _ := rapl.GetEnergyFromCore()
@@ -209,7 +209,7 @@ func (c *Collector) reader() {
 					}
 					comm := (*C.char)(unsafe.Pointer(&ct.Command))
 					// fmt.Printf("pid %v cgroup %v cmd %v\n", ct.PID, ct.CGroupPID, C.GoString(comm))
-					podName, err := pod_lister.GetPodNameFromcGgroupID(ct.CGroupPID)
+					podName, err := podList.GetPodNameFromcGgroupID(ct.CGroupPID)
 					if err != nil {
 						log.Printf("failed to resolve pod for cGroup ID %v: %v", ct.CGroupPID, err)
 						continue
@@ -217,7 +217,7 @@ func (c *Collector) reader() {
 					if _, ok := podEnergy[podName]; !ok {
 						podEnergy[podName] = &PodEnergy{}
 						podEnergy[podName].PodName = podName
-						podNamespace, err := pod_lister.GetPodNameSpaceFromcGgroupID(ct.CGroupPID)
+						podNamespace, err := podList.GetPodNameSpaceFromcGgroupID(ct.CGroupPID)
 						if err != nil {
 							log.Printf("failed to find namespace for cGroup ID %v: %v", ct.CGroupPID, err)
 							podNamespace = "unknown"
@@ -256,8 +256,12 @@ func (c *Collector) reader() {
 						podEnergy[podName].CurrEnergyInGPU += uint64(e)
 						podEnergy[podName].AggEnergyInGPU += podEnergy[podName].CurrEnergyInGPU
 					}
-					rBytes, wBytes, disks, err := pod_lister.ReadCgroupIOStat(ct.CGroupPID)
-					// fmt.Printf("read %d write %d. Agg read %d write %d, err %v\n", rBytes, wBytes, aggBytesRead, aggBytesWrite, err)
+
+					rBytes, wBytes, disks, err := podList.ReadCgroupIOStat(ct.CGroupPID)
+
+					fmt.Println("read IO stats complete ")
+
+					fmt.Printf("read %d write %d. Agg read %d write %d, err %v\n", rBytes, wBytes, aggBytesRead, aggBytesWrite, err)
 					if err == nil {
 						// if this is the first time the cgroup's I/O is accounted, add it to the pod
 						if _, ok := cgroupIO[ct.CGroupPID]; !ok {
@@ -278,12 +282,15 @@ func (c *Collector) reader() {
 				totalReadBytes, totalWriteBytes, disks, err := pod_lister.ReadAllCgroupIOStat()
 				if err == nil {
 					if totalReadBytes > aggBytesRead && totalWriteBytes > aggBytesWrite {
-						rBytes := totalReadBytes - aggBytesRead
-						wBytes := totalWriteBytes - aggBytesWrite
-						podName := pod_lister.GetSystemProcessName()
-						podEnergy[podName].Disks = disks
-						podEnergy[podName].CurrBytesRead = rBytes
-						podEnergy[podName].CurrBytesWrite = wBytes
+						// rBytes := totalReadBytes - aggBytesRead
+						// wBytes := totalWriteBytes - aggBytesWrite
+						podName := podList.GetSystemProcessName()
+						fmt.Println(disks)
+						fmt.Println(podName)
+						// fmt.Println()
+						// podEnergy[podName].Disks = disks
+						// podEnergy[podName].CurrBytesRead = rBytes
+						// podEnergy[podName].CurrBytesWrite = wBytes
 					} else {
 						fmt.Printf("total read %d write %d should be greater than agg read %d agg write %d\n", totalReadBytes, totalWriteBytes, aggBytesRead, aggBytesWrite)
 					}
@@ -292,7 +299,7 @@ func (c *Collector) reader() {
 				//evenly attribute other energy among all pods
 				perProcessOtherMJ := float64(otherDelta / float64(len(podEnergy)))
 
-				_, podMem, _, nodeMem, err := pod_lister.GetPodMetrics()
+				_, podMem, _, nodeMem, err := podList.GetPodMetrics()
 				if err != nil {
 					fmt.Printf("failed to get kubelet metrics: %v", err)
 				}
