@@ -11,10 +11,9 @@ metadata:
 rules:
 - apiGroups: [""]
   resources:
-  - nodes/metrics
-  - nodes/proxy #access /pods
-  - nodes/stats
-  - nodes/metrics # access /metrics/resource  
+  - nodes/metrics # access /metrics/resource
+  - nodes/proxy # access /pods
+  - nodes/stats # access /pods
   verbs:
   - 'get'
   - 'watch'
@@ -68,10 +67,8 @@ spec:
         - /usr/bin/kepler
         - -address
         - 0.0.0.0:9102
-        - -enable-gpu
-        - "true"
-        - -model-server-endpoint
-        - http://127.0.0.1:8100/data
+        - -enable-gpu=true
+        - -enable-cgroup-id=true
         ports:
         - containerPort: 9102
           hostPort: 9102
@@ -81,14 +78,13 @@ spec:
           name: lib-modules
         - mountPath: /sys
           name: tracing
+        - mountPath: /proc
+          name: proc
         env:
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-      - name: kepler-model-server
-        image: quay.io/sustainable_computing_io/kepler_model_server:latest
-        imagePullPolicy: Always
       volumes:
       - name: lib-modules
         hostPath:
@@ -97,6 +93,10 @@ spec:
       - name: tracing
         hostPath:
           path: /sys
+          type: Directory
+      - name: proc
+        hostPath:
+          path: /proc
           type: Directory
 ---
 kind: Service

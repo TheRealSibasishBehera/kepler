@@ -40,3 +40,7 @@ func (r *PowerDummy) GetEnergyFromUncore() (uint64, error) {
 func (r *PowerDummy) GetEnergyFromPackage() (uint64, error) {
 	return 0, nil
 }
+
+func (r *PowerDummy) GetPackageEnergy() map[int]PackageEnergy {
+	return map[int]PackageEnergy{}
+}
