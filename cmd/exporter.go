@@ -36,7 +36,7 @@ var (
 	address             = flag.String("address", "0.0.0.0:8888", "bind address")
 	metricsPath         = flag.String("metrics-path", "/metrics", "metrics path")
 	enableGPU           = flag.Bool("enable-gpu", false, "whether enable gpu (need to have libnvidia-ml installed)")
-	isOnlyContainer     = flag.Bool("only-container", true, "whether isOnlyContainer to implement container_lister")
+	isOnlyContainer     = flag.Bool("only-container", false, "whether isOnlyContainer to implement container_lister")
 	modelServerEndpoint = flag.String("model-server-endpoint", "", "model server endpoint")
 )
 
@@ -65,12 +65,10 @@ func main() {
 	}
 
 	if *isOnlyContainer {
-		fmt.Println("only container started")
 		err = collector.Attach(&pod_lister.PodmanList{})
 		if err != nil {
 			log.Fatalf("failed to attach : %v", err)
 		}
-		fmt.Println("attach over")
 	} else {
 		err = collector.Attach(&pod_lister.KubList{})
 		if err != nil {
@@ -100,10 +98,8 @@ func main() {
 			log.Fatalf("failed to write response: %v", err)
 		}
 	})
-	//
 	err = http.ListenAndServe(*address, nil)
 	if err != nil {
 		log.Fatalf("failed to bind on %s: %v", *address, err)
 	}
-	fmt.Println("exporter call over")
 }
