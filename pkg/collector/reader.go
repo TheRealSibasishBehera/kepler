@@ -174,7 +174,7 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 				for _, energy := range nodeEnergy {
 					nodeEnergyTotal += energy
 				}
-				// ccalculate the other energy consumed besides CPU/GPU and memory
+				// calculate the other energy consumed besides CPU/GPU and memory
 				otherDelta := float64(0)
 				if nodeEnergyTotal > 0 {
 					otherDelta = nodeEnergyTotal - coreDelta - dramDelta - gpuDelta
@@ -282,15 +282,9 @@ func (c *Collector) reader(podList pod_lister.PodLister) {
 				totalReadBytes, totalWriteBytes, disks, err := pod_lister.ReadAllCgroupIOStat()
 				if err == nil {
 					if totalReadBytes > aggBytesRead && totalWriteBytes > aggBytesWrite {
-						// rBytes := totalReadBytes - aggBytesRead
-						// wBytes := totalWriteBytes - aggBytesWrite
 						podName := podList.GetSystemProcessName()
 						fmt.Println(disks)
 						fmt.Println(podName)
-						// fmt.Println()
-						// podEnergy[podName].Disks = disks
-						// podEnergy[podName].CurrBytesRead = rBytes
-						// podEnergy[podName].CurrBytesWrite = wBytes
 					} else {
 						fmt.Printf("total read %d write %d should be greater than agg read %d agg write %d\n", totalReadBytes, totalWriteBytes, aggBytesRead, aggBytesWrite)
 					}
